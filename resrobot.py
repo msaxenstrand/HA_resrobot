@@ -19,7 +19,6 @@ ATTR_DIRECTION = 'direction'
 ATTR_LINE = 'line'
 ATTR_BOARD = 'board'
 
-CONF_PLANER_KEY = 'planer_key'
 CONF_STOLP_KEY = 'stolp_key'
 CONF_SITEID = 'siteid'
 CONF_DIRECTION = 'direction'
@@ -33,11 +32,10 @@ FORCED_UPDATE_FREQUENCY = timedelta(seconds=5)
 USER_AGENT = "Home Assistant Resrobot Sensor"
 
 PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend({
-    vol.Required(CONF_PLANER_KEY): cv.string,
     vol.Required(CONF_STOLP_KEY): cv.string,
-    vol.Optional(CONF_SITEID, default="740070995"): cv.string,
-    vol.Optional(CONF_DIRECTION, default="740000099"): cv.string,
-    vol.Optional(CONF_NAME, default="tillberga"): cv.string,
+    vol.Required(CONF_SITEID): cv.string,
+    vol.Required(CONF_DIRECTION): cv.string,
+    vol.Optional(CONF_NAME, default=""): cv.string,
     vol.Optional(CONF_PASSLIST, default="0"): cv.string,
 })
 
@@ -46,21 +44,17 @@ def setup_platform(hass, config, add_devices, discovery_info=None):
     """Setup the sensor platform."""
 
     data = DepartureBoardData(
-        config.get(CONF_PLANER_KEY),
         config.get(CONF_STOLP_KEY),
         config.get(CONF_SITEID),
         config.get(CONF_DIRECTION),
         config.get(CONF_PASSLIST),
     )
 
-    sensors = []
-    sensors.append(
-        ResrobotSensor(
-            data,
-            config.get(CONF_SITEID),
-            config.get(CONF_NAME)
-        )
-    )
+    sensors = [ResrobotSensor(
+        data,
+        config.get(CONF_SITEID),
+        config.get(CONF_NAME)
+    )]
 
     add_devices(sensors)
 
@@ -73,10 +67,8 @@ class ResrobotSensor(Entity):
         self._siteid = siteid
         self._name = name or siteid
         self._data = data
-        self._nextdeparture = 9999
+        self._nextdeparture = '?'
         self._board = []
-
-        #self._state = None
 
     @property
     def name(self):
@@ -92,6 +84,7 @@ class ResrobotSensor(Entity):
     def state(self):
         """Return the state of the sensor."""
         if len(self._board) > 0:
+            self._name = self._board[0]['name']
             if (self._board[0]['diff'] == 0):
                 return 'Nu'
             else:
@@ -159,8 +152,7 @@ class ResrobotSensor(Entity):
 class DepartureBoardData(object):
     """ Class for retrieving API data """
 
-    def __init__(self, planerapikey, stolpapikey, siteid, direction, passlist):
-        self._planerapikey = planerapikey
+    def __init__(self, stolpapikey, siteid, direction, passlist):
         self._stolpapikey = stolpapikey
         self._siteid = siteid
         self._direction = direction or 0
