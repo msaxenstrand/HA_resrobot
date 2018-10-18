@@ -1,6 +1,7 @@
 import datetime
 from datetime import timedelta
 import logging
+import math
 
 import voluptuous as vol
 import requests
@@ -26,7 +27,7 @@ CONF_PASSLIST = 'passlist'
 CONF_MAXJOURNEYS = 'max_journeys'
 CONF_ATTRIBUTION = "Powered by TRAFIKLAB"
 
-UPDATE_FREQUENCY = timedelta(seconds=60)
+UPDATE_FREQUENCY = timedelta(seconds=15)
 FORCED_UPDATE_FREQUENCY = timedelta(seconds=5)
 
 USER_AGENT = "Home Assistant Resrobot Sensor"
@@ -39,6 +40,7 @@ PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend({
     vol.Optional(CONF_PASSLIST, default="0"): cv.string,
 })
 
+global_diff = None
 
 def setup_platform(hass, config, add_devices, discovery_info=None):
     """Setup the sensor platform."""
@@ -57,6 +59,8 @@ def setup_platform(hass, config, add_devices, discovery_info=None):
     )]
 
     add_devices(sensors)
+
+    data.update()
 
 
 class ResrobotSensor(Entity):
@@ -85,7 +89,7 @@ class ResrobotSensor(Entity):
         """Return the state of the sensor."""
         if len(self._board) > 0:
             self._name = self._board[0]['name']
-            if (self._board[0]['diff'] == 0):
+            if self._board[0]['diff'] == 0:
                 return 'Nu'
             else:
                 return self._board[0]['diff']
@@ -120,7 +124,7 @@ class ResrobotSensor(Entity):
             time_diff = departure - now
             minutes = time_diff / datetime.timedelta(minutes=1)
 
-            return int(minutes)
+            return math.ceil(minutes)
 
         except Exception:
             _LOGGER.error('Failed to parse departure time (%s) ', time)
@@ -146,6 +150,9 @@ class ResrobotSensor(Entity):
 
                 board.append({"name": name, "time": time, "stop": stop, "date": date, "direction": direction, "diff": diff})
 
+                global global_diff
+                global_diff = board[0]['diff']
+
         self._board = sorted(board, key=lambda k: k['diff'])
 
 
@@ -162,6 +169,11 @@ class DepartureBoardData(object):
     @Throttle(UPDATE_FREQUENCY, FORCED_UPDATE_FREQUENCY)
     def update(self, **kwargs):
         """Get the latest data for this site from the API."""
+        global global_diff
+
+        if global_diff and global_diff > 0:
+            _LOGGER.info("No need to fetch Resrobot data, next fetch in {} minutes".format(global_diff))
+            return
         try:
             _LOGGER.info("Fetching Resrobot Data for '%s'", self._siteid)
             url = "https://api.resrobot.se/v2/departureBoard?key={}&id={}&direction={}&passlist={}&format=json". \
@@ -170,7 +182,7 @@ class DepartureBoardData(object):
             req = requests.get(url, headers={"User-agent": USER_AGENT}, allow_redirects=True, timeout=5)
 
         except requests.exceptions.RequestException:
-            _LOGGER.debug("failed fetching SL Data for '%s'", self._siteid)
+            _LOGGER.debug("failed fetching Resrobot Data for '%s'", self._siteid)
             return
 
         if req.status_code == 200:
