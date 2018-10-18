@@ -16,9 +16,15 @@ from homeassistant.util import Throttle
 
 _LOGGER = logging.getLogger(__name__)
 
-ATTR_DIRECTION = 'direction'
-ATTR_LINE = 'line'
 ATTR_BOARD = 'board'
+ATTR_THIS_DIRECTION = 'direction'
+ATTR_THIS_LINE = 'name'
+ATTR_THIS_LINE_NUMBER = 'line'
+ATTR_THIS_TIME = 'time'
+ATTR_NEXT_DIRECTION = 'next_direction'
+ATTR_NEXT_LINE = 'next_name'
+ATTR_NEXT_LINE_NUMBER = 'next_line'
+ATTR_NEXT_TIME = 'next_time'
 
 CONF_STOLP_KEY = 'stolp_key'
 CONF_SITEID = 'siteid'
@@ -102,14 +108,31 @@ class ResrobotSensor(Entity):
         if not self._board:
             return
 
-        for departure in self._board:
-            params = {
-                ATTR_ATTRIBUTION: CONF_ATTRIBUTION,
-                ATTR_DIRECTION: departure.get('direction'),
-                ATTR_LINE: departure.get('name'),
-                ATTR_BOARD: self._board
-            }
-            return {k: v for k, v in params.items() if v}
+        params = {}
+        for idx, departure in enumerate(self._board):
+            if idx == 0:
+                params.update({
+                    ATTR_THIS_DIRECTION: departure.get('direction'),
+                    ATTR_THIS_LINE: departure.get('name'),
+                    ATTR_THIS_LINE_NUMBER: departure.get('line'),
+                    ATTR_THIS_TIME: departure.get('time')
+                })
+            elif idx == 1:
+                params.update({
+                    ATTR_NEXT_DIRECTION: departure.get('direction'),
+                    ATTR_NEXT_LINE: departure.get('name'),
+                    ATTR_NEXT_LINE_NUMBER: departure.get('line'),
+                    ATTR_NEXT_TIME: departure.get('time')
+                })
+            else:
+                break
+
+        params.update({
+            ATTR_ATTRIBUTION: CONF_ATTRIBUTION,
+            ATTR_BOARD: self._board
+        })
+
+        return {k: v for k, v in params.items() if v}
 
     @property
     def unit_of_measurement(self):
@@ -142,13 +165,14 @@ class ResrobotSensor(Entity):
         else:
             for idx, value in enumerate(self._data.data['Departure']):
                 name = value['name'] or 'No name'
+                line = value['transportNumber'] or ''
                 stop = value['stop'] or 'Unknown stop'
                 time = value['time'] or ''
                 date = value['date'] or ''
                 direction = value['direction'] or 'Unknown direction'
                 diff = self.get_time_to_departure(time, date)
 
-                board.append({"name": name, "time": time, "stop": stop, "date": date, "direction": direction, "diff": diff})
+                board.append({"name": name, "line": line, "time": time, "stop": stop, "date": date, "direction": direction, "diff": diff})
 
                 global global_diff
                 global_diff = board[0]['diff']
@@ -172,8 +196,8 @@ class DepartureBoardData(object):
         global global_diff
 
         if global_diff and global_diff > 0:
-            _LOGGER.info("No need to fetch Resrobot data, next fetch in {} minutes".format(global_diff))
             return
+
         try:
             _LOGGER.info("Fetching Resrobot Data for '%s'", self._siteid)
             url = "https://api.resrobot.se/v2/departureBoard?key={}&id={}&direction={}&passlist={}&format=json". \
@@ -182,13 +206,13 @@ class DepartureBoardData(object):
             req = requests.get(url, headers={"User-agent": USER_AGENT}, allow_redirects=True, timeout=5)
 
         except requests.exceptions.RequestException:
-            _LOGGER.debug("failed fetching Resrobot Data for '%s'", self._siteid)
+            _LOGGER.error("failed fetching Resrobot Data for '%s'", self._siteid)
             return
 
         if req.status_code == 200:
             self.data = req.json()
 
         else:
-            _LOGGER.debug("failed fetching Resrobot Data for '%s'"
+            _LOGGER.error("failed fetching Resrobot Data for '%s'"
                           "(HTTP Status_code = %d)", self._siteid,
                           req.status_code)
