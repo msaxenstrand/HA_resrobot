@@ -21,10 +21,12 @@ ATTR_THIS_DIRECTION = 'direction'
 ATTR_THIS_LINE = 'name'
 ATTR_THIS_LINE_NUMBER = 'line'
 ATTR_THIS_TIME = 'time'
+ATTR_THIS_DIFF = 'diff'
 ATTR_NEXT_DIRECTION = 'next_direction'
 ATTR_NEXT_LINE = 'next_name'
 ATTR_NEXT_LINE_NUMBER = 'next_line'
 ATTR_NEXT_TIME = 'next_time'
+ATTR_NEXT_DIFF = 'next_diff'
 
 CONF_STOLP_KEY = 'stolp_key'
 CONF_SITEID = 'siteid'
@@ -115,14 +117,16 @@ class ResrobotSensor(Entity):
                     ATTR_THIS_DIRECTION: departure.get('direction'),
                     ATTR_THIS_LINE: departure.get('name'),
                     ATTR_THIS_LINE_NUMBER: departure.get('line'),
-                    ATTR_THIS_TIME: departure.get('time')
+                    ATTR_THIS_TIME: departure.get('time'),
+                    ATTR_THIS_DIFF: departure.get('diff')
                 })
             elif idx == 1:
                 params.update({
                     ATTR_NEXT_DIRECTION: departure.get('direction'),
                     ATTR_NEXT_LINE: departure.get('name'),
                     ATTR_NEXT_LINE_NUMBER: departure.get('line'),
-                    ATTR_NEXT_TIME: departure.get('time')
+                    ATTR_NEXT_TIME: departure.get('time'),
+                    ATTR_NEXT_DIFF: departure.get('diff')
                 })
             else:
                 break
@@ -143,7 +147,7 @@ class ResrobotSensor(Entity):
         try:
             now = datetime.datetime.now()
             departure_string = '{} {}'.format(date, time)
-            departure = datetime.datetime.strptime(departure_string, "%Y-%m-%d %H:%M:%S")
+            departure = datetime.datetime.strptime(departure_string, "%Y-%m-%d %H:%M")
             time_diff = departure - now
             minutes = time_diff / datetime.timedelta(minutes=1)
 
@@ -167,7 +171,7 @@ class ResrobotSensor(Entity):
                 name = value['name'] or 'No name'
                 line = value['transportNumber'] or ''
                 stop = value['stop'] or 'Unknown stop'
-                time = value['time'] or ''
+                time = value['time'][:-3] or ''
                 date = value['date'] or ''
                 direction = value['direction'] or 'Unknown direction'
                 diff = self.get_time_to_departure(time, date)
