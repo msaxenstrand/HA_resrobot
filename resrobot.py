@@ -176,7 +176,8 @@ class ResrobotSensor(Entity):
                 direction = value['direction'] or 'Unknown direction'
                 diff = self.get_time_to_departure(time, date)
 
-                board.append({"name": name, "line": line, "time": time, "stop": stop, "date": date, "direction": direction, "diff": diff})
+                if diff > -1:
+                    board.append({"name": name, "line": line, "time": time, "stop": stop, "date": date, "direction": direction, "diff": diff})
 
                 global global_diff
                 global_diff = board[0]['diff']
